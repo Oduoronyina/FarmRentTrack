@@ -1,10 +1,8 @@
 import { query, update, text, Record, StableBTreeMap, Variant, Vec, None, Some, Ok, Err, ic, Principal, Opt, nat64, Duration, Result, bool, Canister } from "azle";
-import {
-    Ledger, binaryAddressFromAddress, binaryAddressFromPrincipal, hexAddressFromPrincipal
-} from "azle/canisters/ledger";
-import { hashCode } from "hashcode";
+import { Ledger, binaryAddressFromPrincipal, hexAddressFromPrincipal } from "azle/canisters/ledger";
 import { v4 as uuidv4 } from "uuid";
 
+// Define record types
 const Animal = Record({
     id: text,
     name: text,
@@ -26,7 +24,7 @@ const FarmSection = Record({
 const FarmRenter = Record({
     id: text,
     name: text,
-    renter : Principal,
+    renter: Principal,
 });
 
 const AnimalPayload = Record({
@@ -43,18 +41,11 @@ const FarmSectionPayload = Record({
     rentPrice: nat64,
 });
 
-
-
-
-
 const ReserveStatus = Variant({
     PaymentPending: text,
     Completed: text
 });
 
-
-
-// Stay with implementing Payment for Reserving 
 const Reserve = Record({
     farmSectionId: text,
     price: nat64,
@@ -71,95 +62,55 @@ const Message = Variant({
     PaymentCompleted: text
 });
 
-
-const animalStorage = StableBTreeMap(0,text, Animal)
-const farmStorage =  StableBTreeMap(1,text, FarmSection)
-const renterStorage = StableBTreeMap(2,text, FarmRenter)
+// Define data storage
+const animalStorage = StableBTreeMap(0, text, Animal);
+const farmStorage = StableBTreeMap(1, text, FarmSection);
+const renterStorage = StableBTreeMap(2, text, FarmRenter);
 const persistedReserves = StableBTreeMap(3, Principal, Reserve);
 const pendingReserves = StableBTreeMap(4, nat64, Reserve);
 
-
+// Define constants
 const TIMEOUT_PERIOD = 3600n; // reservation period in seconds
 
-
-/* 
-    initialization of the Ledger canister. The principal text value is hardcoded because 
-    we set it in the `dfx.json`
-*/
-const icpCanister = Ledger(Principal.fromText("ryjl3-tyaaa-aaaaa-aaaba-cai"));
-
+// Define the canister export
 export default Canister({
 
-    // Get all the animals
-    getAnimals: query([], Vec(Animal), () => {
-        return animalStorage.values();
-    }),
-
-    // Get animal by id
+    // Query functions
+    getAnimals: query([], Vec(Animal), () => animalStorage.values()),
     getAnimal: query([text], Result(Animal, Message), (id) => {
         const animalOpt = animalStorage.get(id);
-        if ("None" in animalOpt) {
-            return Err({ NotFound: `animal with id=${id} not found` });
-        }
-        return Ok(animalOpt.Some);
+        return animalOpt ? Ok(animalOpt) : Err({ NotFound: `Animal with id=${id} not found` });
     }),
-
-    // Get all the farm sections
-    getFarmSections: query([], Vec(FarmSection), () => {
-        return farmStorage.values();
-    }),
-
-    // Get farm section by id
+    getFarmSections: query([], Vec(FarmSection), () => farmStorage.values()),
     getFarmSection: query([text], Result(FarmSection, Message), (id) => {
         const farmSectionOpt = farmStorage.get(id);
-        if ("None" in farmSectionOpt) {
-            return Err({ NotFound: `farm section with id=${id} not found` });
-        }
-        return Ok(farmSectionOpt.Some);
+        return farmSectionOpt ? Ok(farmSectionOpt) : Err({ NotFound: `Farm section with id=${id} not found` });
     }),
-
-    // Get all the renters
-    getRenters: query([], Vec(FarmRenter), () => {
-        return renterStorage.values();
-    }),
-
-    // Get renter by id
+    getRenters: query([], Vec(FarmRenter), () => renterStorage.values()),
     getRenter: query([text], Result(FarmRenter, Message), (id) => {
         const renterOpt = renterStorage.get(id);
-        if ("None" in renterOpt) {
-            return Err({ NotFound: `renter with id=${id} not found` });
-        }
-        return Ok(renterOpt.Some);
+        return renterOpt ? Ok(renterOpt) : Err({ NotFound: `Renter with id=${id} not found` });
     }),
 
-    // Add a new animal
+    // Update functions
     addAnimal: update([AnimalPayload], Result(Animal, Message), (payload) => {
-        if (typeof payload !== "object" || Object.keys(payload).length === 0) {
-            return Err({ InvalidPayload: "invalid payoad" })
-        }
+        if (!payload || Object.keys(payload).length === 0) return Err({ InvalidPayload: "Invalid payload" });
         const animal = { id: uuidv4(), ...payload };
         animalStorage.insert(animal.id, animal);
         return Ok(animal);
     }),
-
-    // Add a new farm section
     addFarmSection: update([FarmSectionPayload], Result(FarmSection, Message), (payload) => {
-        if (typeof payload !== "object" || Object.keys(payload).length === 0) {
-            return Err({ InvalidPayload: "invalid payoad" })
-        }
-        const farmSection = { id: uuidv4(),renter: None,animals: [], ...payload };
+        if (!payload || Object.keys(payload).length === 0) return Err({ InvalidPayload: "Invalid payload" });
+        const farmSection = { id: uuidv4(), renter: None, animals: [], ...payload };
         farmStorage.insert(farmSection.id, farmSection);
         return Ok(farmSection);
     }),
-
-    // Add a new renter
     addRenter: update([text], Result(FarmRenter, Message), (name) => {
-        const renter = { id: uuidv4(), name: name, renter: ic.caller() };
+        const renter = { id: uuidv4(), name, renter: ic.caller() };
         renterStorage.insert(renter.id, renter);
         return Ok(renter);
     }),
-
-    // Rent a farm section
+   // Rent a farm section
     rentFarmSection: update([text, text], Result(FarmSection, Message), (renterId, farmSectionId) => {
         const renterOpt = renterStorage.get(renterId);
         if ("None" in renterOpt) {
