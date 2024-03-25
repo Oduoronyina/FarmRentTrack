@@ -1,29 +1,26 @@
 import { Principal } from "@dfinity/principal";
 import { transferICP } from "./ledger";
 
-export async function createProduct(product) {
-  return window.canister.farmRentTrack.addProduct(product);
-}
 
 // addAnimal
-export async function addAnimal(animal) {
+export async function createAnimal(animal) {
   return window.canister.farmRentTrack.addAnimal(animal);
 }
 
 // addFarmSection
-export async function addFarmSection(farmSection) {
+export async function createFarmSection(farmSection) {
   return window.canister.farmRentTrack.addFarmSection(farmSection);
 }
 
 // addRenter
-export async function addRenter(renter) {
+export async function createRenter(renter) {
   return window.canister.farmRentTrack.addRenter(renter);
 }
 
 
 export async function getAnimals() {
   try {
-    return await window.canister.farmRentTrack.getProducts();
+    return await window.canister.farmRentTrack.getAnimals();
   } catch (err) {
     if (err.name === "AgentHTTPResponseError") {
       const authClient = window.auth.client;
@@ -99,6 +96,20 @@ export async function deleteRenter(id) {
   return window.canister.farmRentTrack.deleteRenter(id);
 }
 
+// getFarmSectionAnimals
+export async function getFarmSectionAnimals(farmSectionId) {
+  return window.canister.farmRentTrack.getFarmSectionAnimals(farmSectionId);
+}
+
+// addAnimalToFarmSection
+export async function addAnimalToFarmSection(farmSectionId, animalId) {
+  return window.canister.farmRentTrack.addAnimalToFarmSection(farmSectionId, animalId);
+}
+
+// removeAnimalFromFarmSection
+export async function removeAnimalFromFarmSection(farmSectionId, animalId) {
+  return window.canister.farmRentTrack.removeAnimalFromFarmSection(farmSectionId, animalId);
+}
 
 // rentPayFarmSection
 export async function rentPayFarmSection(farmSect) {
@@ -107,5 +118,5 @@ export async function rentPayFarmSection(farmSect) {
   const sellerPrincipal = Principal.from(orderResponse.Ok.reservor);
   const sellerAddress = await marketplaceCanister.getAddressFromPrincipal(sellerPrincipal);
   const block = await transferICP(sellerAddress, orderResponse.Ok.price, orderResponse.Ok.memo);
-  await marketplaceCanister.completePurchase(sellerPrincipal, farmSect.id, orderResponse.Ok.price, block, orderResponse.Ok.memo);
+  await marketplaceCanister.completeReservePayment(sellerPrincipal, farmSect.id, orderResponse.Ok.price, block, orderResponse.Ok.memo);
 }

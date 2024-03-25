@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 const Animal = Record({
     id: text,
     name: text,
-    ageRange: nat64,
+    ageRange: text,
     species: text,
     breed: text,
     description: text,
@@ -17,6 +17,7 @@ const Animal = Record({
 const FarmSection = Record({
     id: text,
     name: text,
+    state: text,
     owner: Principal,
     rentPrice: nat64,
     renter: Opt(text),
@@ -31,7 +32,7 @@ const FarmRenter = Record({
 
 const AnimalPayload = Record({
     name: text,
-    ageRange: nat64,
+    ageRange: text,
     species: text,
     breed: text,
     description: text,
@@ -39,7 +40,6 @@ const AnimalPayload = Record({
 
 const FarmSectionPayload = Record({
     name: text,
-    owner: Principal,
     rentPrice: nat64,
 });
 
@@ -104,6 +104,15 @@ export default Canister({
         return Ok(animalOpt.Some);
     }),
 
+    // get List of all animals in a farm section
+    getFarmSectionAnimals: query([text], Vec(Animal), (id) => {
+        const farmSectionOpt = farmStorage.get(id);
+        if ("None" in farmSectionOpt) {
+            return [];
+        }
+        return farmSectionOpt.Some.animals;
+    }),
+
     // Get all the farm sections
     getFarmSections: query([], Vec(FarmSection), () => {
         return farmStorage.values();
@@ -142,12 +151,47 @@ export default Canister({
         return Ok(animal);
     }),
 
+    // Add animal to a farm section
+    addAnimalToFarmSection: update([text, text], Result(Animal, Message), (farmSectionId, animalId) => {
+        const farmSectionOpt = farmStorage.get(farmSectionId);
+        if ("None" in farmSectionOpt) {
+            return Err({ NotFound: `cannot add animal to farm section: farm section with id=${farmSectionId} not found` });
+        }
+        const animalOpt = animalStorage.get(animalId);
+        if ("None" in animalOpt) {
+            return Err({ NotFound: `cannot add animal to farm section: animal with id=${animalId} not found` });
+        }
+        const farmSection = farmSectionOpt.Some;
+        farmSection.animals.push(animalOpt.Some);
+        farmStorage.insert(farmSectionId, farmSection);
+        return Ok(animalOpt.Some);
+
+    }),
+
+    // Remove animal from a farm section
+    removeAnimalFromFarmSection: update([text, text], Result(Animal, Message), (farmSectionId, animalId) => {
+        const farmSectionOpt = farmStorage.get(farmSectionId);
+        if ("None" in farmSectionOpt) {
+            return Err({ NotFound: `cannot remove animal from farm section: farm section with id=${farmSectionId} not found` });
+        }
+
+        const farmSection = farmSectionOpt.Some;
+         for (let i = 0; i < farmSection.animals.length; i++) {
+            if (farmSection.animals[i].id === animalId) {
+                const removedAnimal = farmSection.animals.splice(i, 1)[0];
+                farmStorage.insert(farmSectionId, farmSection);
+                return Ok(removedAnimal);
+            }
+        }
+        return Err({ NotFound: `cannot remove animal from farm section: animal with id=${animalId} not found in farm section with id=${farmSectionId}` });
+    }),
+
     // Add a new farm section
     addFarmSection: update([FarmSectionPayload], Result(FarmSection, Message), (payload) => {
         if (typeof payload !== "object" || Object.keys(payload).length === 0) {
             return Err({ InvalidPayload: "invalid payoad" })
         }
-        const farmSection = { id: uuidv4(),renter: None,animals: [], ...payload };
+        const farmSection = { id: uuidv4(),owner: ic.caller(),state:"open", renter: None,animals: [], ...payload };
         farmStorage.insert(farmSection.id, farmSection);
         return Ok(farmSection);
     }),
@@ -169,10 +213,11 @@ export default Canister({
         if ("None" in farmSectionOpt) {
             return Err({ NotFound: `cannot rent farm section: farm section with id=${farmSectionId} not found` });
         }
-        if (farmSectionOpt.Some.renter !== None) {
-            return Err({ NotFound: `cannot rent farm section: farm section with id=${farmSectionId} already rented` });
-        }
-        farmSectionOpt.Some.renter = Some(renterId);
+  
+        const renterName = renterOpt.Some.name;
+        farmSectionOpt.Some.renter = Some(renterName);
+        console.log("renterOt",renterOpt.Some)
+        console.log("farm Section",farmSectionOpt.Some)
         farmStorage.insert(farmSectionId, farmSectionOpt.Some);
         return Ok(farmSectionOpt.Some);
     }),
@@ -275,7 +320,7 @@ export default Canister({
     ),
 
     // Complete a reserve for book
-    completeReserveayment: update([Principal,text,nat64, nat64, nat64], Result(Reserve, Message), async (reservor,farmSectionId,reservePrice, block, memo) => {
+    completeReservePayment: update([Principal,text,nat64, nat64, nat64], Result(Reserve, Message), async (reservor,farmSectionId,reservePrice, block, memo) => {
         const paymentVerified = await verifyPaymentInternal(reservor,reservePrice, block, memo);
         if (!paymentVerified) {
             return Err({ NotFound: `cannot complete the reserve: cannot verify the payment, memo=${memo}` });
@@ -291,6 +336,7 @@ export default Canister({
             throw Error(`Farm section with id=${farmSectionId} not found`)
         }
         const farm = farmOpt.Some;
+        farm.state = "reserved"
         farmStorage.insert(farm.id,farm)
         persistedReserves.insert(ic.caller(), updatedReserve);
         return Ok(updatedReserve);
