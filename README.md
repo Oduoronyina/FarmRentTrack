@@ -58,3 +58,28 @@ Otherwise, these changes won't be reflected in IDL's and won't work when called 
 
 ### Marketplace frontend canister
 `dfx deploy dfinity_js_frontend` - deployes the frontend app for the `dfinity_js_backend` canister on IC.
+
+## Running The Project Commands
+
+`dfx stop && dfx start --background --clean`
+`./deploy-local-ledger.sh`
+`dfx deploy internet_identity`
+`dfx deploy dfinity_js_backend && dfx generate dfinity_js_backend` 
+`dfx deploy dfinity_js_frontend`
+
+## Steps to Be able to succesfully Rent a Farm Section 
+After You Login using Internet Identity at the Top Right Dropdown we have a dropdown showing the Principal.
+This is needed so as to Transfer ICP to the wallet.Using the browser Incognito you could Login as different user.
+
+The Address intended to make a Rent Farm Section(Rent Action), Should follow this steps below to Transfer ICP :
+
+Transfer ICP:
+`dfx ledger transfer <ADDRESS>  --memo 0 --icp 1000 --fee 0`
+where:
+ - `--memo` is some correlation id that can be set to identify some particular transactions (we use that in the marketplace canister).
+ - `--icp` is the transfer amount
+ - `--fee` is the transaction fee. In this case it's 0 because we make this transfer as the minter idenity thus this transaction is of type MINT, not TRANSFER.
+ - `<ADDRESS>` is the address of the recipient. To get the address from the principal, you can use the helper function from the marketplace canister - `getAddressFromPrincipal(principal: Principal)`, it can be called via the Candid UI.
+
+
+After which the account wallet reflects the amount. From this point The Rent functionality passes archieving Transfer of tokens to the Farm Creator/Owner

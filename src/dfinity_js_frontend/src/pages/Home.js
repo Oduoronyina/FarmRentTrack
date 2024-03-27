@@ -116,8 +116,7 @@ const Home = () => {
             toast(<NotificationSuccess text="Farm Section Rented successfully" />);
           });
         } catch (error) {
-            console.log("error", error)
-          toast(<NotificationError text="Failed to Rent Farm Section." />);
+          toast(<NotificationError text="Failed to Rent Farm Section. You need to have Enough ICP tokens in wallet." />);
         } finally {
           setLoading(false);
         }
